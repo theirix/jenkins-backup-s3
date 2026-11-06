@@ -32,6 +32,10 @@ Bucket prefix (defaults to "jenkins-backups"):
 Bucket region (defaults to "us-east-1"):
   - `backup-jenkins --bucket-region={BUCKET_REGION}`
 
+Storage class for uploaded backups (defaults to "STANDARD"; `create` command option):
+  - `backup-jenkins --bucket={BUCKET_NAME} create --storage-class={STORAGE_CLASS}`
+  - Choices: STANDARD, REDUCED_REDUNDANCY, STANDARD_IA, ONEZONE_IA, INTELLIGENT_TIERING, GLACIER, DEEP_ARCHIVE, GLACIER_IR
+
 Available commands:
   - `create`
   - `restore`

@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 DEFAULT_REGION='us-east-1'
+DEFAULT_STORAGE_CLASS='STANDARD'
+STORAGE_CLASSES=['STANDARD', 'REDUCED_REDUNDANCY', 'STANDARD_IA', 'ONEZONE_IA', 'INTELLIGENT_TIERING', 'GLACIER', 'DEEP_ARCHIVE', 'GLACIER_IR']
 
 ch = logging.StreamHandler()
 
@@ -48,11 +50,11 @@ class S3Backups(object):
             backups.append(key.replace("%s/" % self.__bucket_prefix, '').replace(self.KEY_SUFFIX, ''))
         return backups
 
-    def backup(self, file_path, backup_name):
+    def backup(self, file_path, backup_name, storage_class=DEFAULT_STORAGE_CLASS):
         key = "%s/%s%s" % (self.__bucket_prefix, backup_name, self.KEY_SUFFIX)
-        logger.debug(colored('Attempting to upload object to S3', 'white'))
+        logger.debug(colored('Attempting to upload object to S3 with storage class %s' % storage_class, 'white'))
         try:
-            s3_object = self.s3.Object(self.__bucket, key).upload_file(file_path, Callback=logger.info(colored('File uploaded to S3 successfully', 'blue')))
+            s3_object = self.s3.Object(self.__bucket, key).upload_file(file_path, ExtraArgs={'StorageClass': storage_class}, Callback=logger.info(colored('File uploaded to S3 successfully', 'blue')))
         except S3UploadFailedError as e:
             logger.critical(colored("Error uploading file to S3: %s" % e, 'red'))
 
@@ -111,9 +113,10 @@ def cli(ctx, bucket, bucket_prefix, bucket_region, log_level):
 @click.option('--exclude-maven/--include-maven', default=True, help='Exclude maven repository from the backup : defaults to true')
 @click.option('--exclude-logs/--include-logs', default=True, help='Exclude logs from the backup : defaults to true')
 @click.option('--exclude', '-e', type=click.STRING, multiple=True, help='Additional directories to exclude from the backup')
+@click.option('--storage-class', type=click.Choice(STORAGE_CLASSES), default=DEFAULT_STORAGE_CLASS, help='S3 storage class of the uploaded backup : defaults to "%s"' % DEFAULT_STORAGE_CLASS)
 @click.option('--dry-run', type=click.BOOL, is_flag=True, help='Create tar archive as "tmp" but do not upload it to S3 : defaults to false')
 def create(ctx, jenkins_home, tmp, tar, tar_opts, exclude_jenkins_war, exclude_vcs, ignore_fail, exclude_archive, exclude_target,
-            exclude_builds, exclude_workspace, exclude_maven, exclude_logs, exclude, dry_run):
+            exclude_builds, exclude_workspace, exclude_maven, exclude_logs, exclude, storage_class, dry_run):
     """Create a backup"""
     logger.info(colored("Backing up %s to %s/%s" % (jenkins_home, ctx.obj['BUCKET'], ctx.obj['BUCKET_PREFIX']), 'blue'))
 
@@ -159,7 +162,7 @@ def create(ctx, jenkins_home, tmp, tar, tar_opts, exclude_jenkins_war, exclude_v
     if dry_run:
         logger.info(colored("Would have created backup id %s from %s" % (backup_id, tmp), 'green'))
     else:
-        s3.backup(tmp, backup_id)
+        s3.backup(tmp, backup_id, storage_class)
         os.remove(tmp)
 
         logger.info(colored("Created backup id %s" % backup_id, 'green'))
